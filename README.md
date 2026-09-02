@@ -46,7 +46,7 @@ Docker e Docker Compose instalados
 Crie e ative seu ambiente virtual (via Conda ou venv) e instale as dependências:
 
 Bash
-pip install -r requerimentos.txt
+pip install -r requirements.txt
 
 2. Iniciar a Infraestrutura (Kafka + Zookeeper)
 Na raiz do projeto, suba os serviços em segundo plano:
