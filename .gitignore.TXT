@@ -1,0 +1,11 @@
+# Caches do interpretador Python 🐍
+__pycache__/
+*.pyc
+
+# Ambientes virtuais locais
+.venv/
+env/
+
+# Arquivos de sistema 💻
+.DS_Store
+Thumbs.db
