@@ -1,101 +1,168 @@
-# 🚗 Pipeline de Telemetria e Detecção de Infrações de Trânsito
+```markdown
+# 🛰️ Pipeline de Telemetria e Streaming com Apache Kafka
 
-Pipeline de dados ponta a ponta que simula, ingere e processa eventos de telemetria veicular em tempo real utilizando Apache Kafka, arquitetura em camadas (Bronze, Prata e Ouro) com Pandas e geração de visualizações analíticas com Matplotlib.
+Pipeline de dados em tempo real desenvolvido em Python e Apache Kafka para ingestão de telemetria veicular (GPS), aplicação de regras de negócio em trânsito (detecção de excesso de velocidade) e persistência de dados em formato JSON Lines (*Data Lake*).
 
 ---
 
-## 📂 Estrutura do Projeto
+## 📌 Visão Geral da Arquitetura
+
+O sistema implementa o padrão produtor-consumidor baseado em eventos:
+
+* 🚗 **Produtor (`fonte/produtor.py`):** Simula múltiplos veículos enviando coordenadas GPS, identificadores (`driver_id`) e velocidade instantânea para o tópico `gps-tracking`.
+* 📬 **Broker (`Apache Kafka via Docker`):** Gerencia a fila de mensagens distribuída, retenção e particionamento do tópico.
+* ⚙️ **Consumidor (`fonte/consumidor.py`):** Processa o stream em tempo real, aplica geofencing simples e limites de velocidade dinâmicos (vias comuns vs. zonas de risco como hospitais e escolas) e emite alertas no terminal.
+* 💾 **Armazenamento (`dados/data_lake_infracoes.jsonl`):** Persiste apenas os eventos classificados como infração diretamente em disco em formato `.jsonl`.
+
+---
+
+## 📂 Estrutura do Diretório
 
 ```text
-.
-├── docker-compose.yml       # Orquestração do Kafka e Zookeeper
-├── requirements.txt         # Dependências do projeto
-├── .gitignore               # Arquivos e diretórios ignorados pelo Git
-├── README.md                # Documentação técnica do projeto
-├── dados/                   # Camadas de dados (Bronze, Prata e Ouro)
-│   ├── data_lake_infracoes.jsonl
-│   └── relatorio_infracoes.csv
-├── imagens/                 # Gráficos analíticos gerados
-│   ├── grafico_infracoes.png
-│   ├── grafico_local.png
-│   └── grafico_media_excesso.png
-└── fonte/                   # Código-fonte da aplicação
-    ├── produtor.py
-    ├── consumidor.py
-    ├── analise.py
-    └── visualizacao.py
+projeto-kafka-streaming/
+├── dados/
+│   └── data_lake_infracoes.jsonl    # Eventos de infrações persistidos
+├── fonte/
+│   ├── consumidor.py                # Processamento de regras e alertas
+│   └── produtor.py                  # Gerador de eventos de telemetria GPS
+├── docker-compose.yml               # Orquestração do cluster Kafka / Zookeeper
+├── requirements.txt                 # Dependências Python do projeto
+└── README.md
 
-🏗️ Arquitetura da Solução
-O pipeline adota o padrão de arquitetura medalhão para fluxo de streaming e processamento analítico em lote:
+```
 
-📡 Produtor (fonte/produtor.py): Simula o envio contínuo de eventos de telemetria veicular (identificador do condutor, velocidade e zona de tráfego) para um tópico do Apache Kafka.
+---
 
-🛑 Consumidor (fonte/consumidor.py): Consome eventos em tempo real, aplica regras de negócio (limites de velocidade e zonas monitoradas) e persiste as violações detectadas no formato JSONL em dados/data_lake_infracoes.jsonl (Camada Bronze).
+## ⚙️ Pré-requisitos
 
-⚙️ Processamento e Análise (fonte/analise.py): Realiza limpeza de dados, tratamento de valores ausentes, cálculo da métrica de severidade (excesso_kmh) (Camada Prata) e consolida as métricas agregadas em dados/relatorio_infracoes.csv (Camada Ouro).
+* [Docker](https://www.docker.com/) e Docker Compose instalados.
+* [Python 3.10+](https://www.python.org/) configurado.
 
-📊 Visualização (fonte/visualizacao.py): Consome os dados refinados e gera gráficos analíticos de volumetria, concentração geográfica e severidade, salvando os resultados em imagens/.
+---
 
-🚀 Como Executar o Projeto
-Pré-requisitos
-Python 3.10+
+## 🚀 Como Executar
 
-Docker e Docker Compose instalados
+### 1. Inicializar a Infraestrutura Kafka
 
-1. Preparar o Ambiente Python
-Crie e ative seu ambiente virtual (via Conda ou venv) e instale as dependências:
+Suba os contêineres do Zookeeper e Kafka em segundo plano:
 
-Bash
-pip install -r requirements.txt
-
-2. Iniciar a Infraestrutura (Kafka + Zookeeper)
-Na raiz do projeto, suba os serviços em segundo plano:
-
-Bash
+```bash
 docker compose up -d
 
-Verifique se os contêineres estão em execução:
+```
 
-Bash
+Verifique se os serviços estão saudáveis:
+
+```bash
 docker compose ps
 
-3. Executar o Pipeline de Streaming
-Abra dois terminais com o ambiente virtual ativo:
+```
 
-Terminal 1 (Consumidor): Inicie o consumidor para aguardar e processar os eventos:
+---
 
-Bash
+### 2. Configurar o Ambiente Virtual Python
+
+Crie e ative o ambiente virtual para isolar as bibliotecas:
+
+* **Windows:**
+```bash
+python -m venv kafka_env
+.\kafka_env\Scripts\activate
+
+```
+
+
+* **Linux / macOS:**
+```bash
+python3 -m venv kafka_env
+source kafka_env/bin/activate
+
+```
+
+
+
+Instale as dependências listadas no `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+
+```
+
+> ⚠️ **Nota sobre dependências:** Este projeto utiliza a biblioteca `kafka-python-ng` para garantir compatibilidade com versões recentes do Python (3.12+ no Windows), substituindo a versão legada e evitando falhas de descritor de arquivo (`selectors`).
+
+---
+
+### 3. Iniciar o Consumidor (Processamento de Regras)
+
+Em um terminal com o ambiente virtual ativado:
+
+```bash
 python fonte/consumidor.py
 
-Terminal 2 (Produtor): Dispare a simulação de telemetria:
+```
 
-Bash
+O consumidor ficará ativo aguardando novas mensagens no tópico `gps-tracking`.
+
+---
+
+### 4. Iniciar o Produtor (Transmissão de Telemetria)
+
+Abra um segundo terminal, ative o ambiente virtual e inicie a transmissão:
+
+```bash
 python fonte/produtor.py
 
-4. Processamento Analítico e Visualização
-Após coletar as mensagens desejadas, execute a transformação dos dados e a geração dos gráficos:
+```
 
-Bash
-# Limpeza, enriquecimento e agregação (Camadas Prata e Ouro)
-python fonte/analise.py
+Os eventos de telemetria serão transmitidos a cada 2 segundos.
 
-# Geração dos gráficos analíticos na pasta imagens/
-python fonte/visualizacao.py
+---
 
-📊 Resultados e Visualizações
-Abaixo estão os artefatos visuais gerados pela camada analítica para suporte à tomada de decisão:
+## 🔍 Inspeção dos Dados Persistidos
 
-1. Volumetria de Infrações por Motorista
-Mapeia a reincidência de infrações por condutor:
+As infrações filtradas são salvas automaticamente na pasta `dados/`. Para inspecionar os registros salvos:
 
-Insight: Permite inferir qual dos motoristas possui a maior quantidade de infrações registradas.
+* **Windows (CMD):**
+```cmd
+type dados\data_lake_infracoes.jsonl
 
-2. Distribuição Espacial de Infrações
-Analisa a concentração de ocorrências por tipo de via:
+```
 
-Insight: Permite inferir quais localizações tiveram maior número de violações para direcionamento de fiscalização e sinalização preventiva.
 
-3. Severidade Média de Excesso de Velocidade
-Mede a gravidade das infrações ao calcular a média em km/h acima do limite permitido:
+* **Linux / macOS / PowerShell:**
+```bash
+cat dados/data_lake_infracoes.jsonl
 
-Insight: Permite inferir a média de velocidade excedida por cada motorista, separando pequenas infrações de condutas de risco severo.
+```
+
+
+
+Exemplo de registro gravado no Data Lake:
+
+```json
+{
+  "timestamp": "2026-09-02T01:07:08.969841",
+  "driver_id": "driver_02",
+  "velocidade_registrada": 69,
+  "limite_permitido": 40,
+  "tipo_local": "Zona de risco (Hospital das Clínicas)",
+  "latitude": -23.554104,
+  "longitude": -46.650596
+}
+
+```
+
+---
+
+## 🛑 Gerenciamento da Infraestrutura
+
+Para pausar os scripts Python nos terminais, utilize o atalho **`Ctrl + C`**.
+
+Para gerenciar os contêineres Docker:
+
+| Ação | Comando | Descrição |
+| --- | --- | --- |
+| **Pausar** | `docker compose stop` | Congela a execução sem remover redes ou contêineres. |
+| **Encerrar** | `docker compose down` | Desliga e remove os contêineres e redes criadas. |
+| **Reset Total** | `docker compose down -v` | Remove os contêineres, redes e volumes (apaga dados persistidos no Kafka). |
+
