@@ -9,7 +9,7 @@ Pipeline de dados ponta a ponta que simula, ingere e processa eventos de telemet
 ```text
 .
 ├── docker-compose.yml       # Orquestração do Kafka e Zookeeper
-├── requerimentos.txt         # Dependências do projeto
+├── requirements.txt         # Dependências do projeto
 ├── .gitignore               # Arquivos e diretórios ignorados pelo Git
 ├── README.md                # Documentação técnica do projeto
 ├── dados/                   # Camadas de dados (Bronze, Prata e Ouro)
